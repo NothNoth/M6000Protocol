@@ -12,7 +12,7 @@ This is a Work In Progress (WIP).
 By default, the following IP addresses are used:
 
   - Icon: 192.168.1.125
-  - Mainframe: the 192.168.1.249
+  - Mainframe: the 192.168.1.126
 
 The Icon unit is technically a Windows NT4 PC, thus it will use some well known Microsoft protocols by default such as NetBIOS.
 Upon startup, the Icon declares itself on the NetBIOS UDP service.
@@ -88,11 +88,7 @@ Each block has the following format:
 
 One single payload may contain multiple blocks and blocks may be truncated and split over multiple payloads.
 
-Misc notes:
-
-  - Most blocks can be found at regular interval on the dumps
-
-### First message
+### MIDI reset message
 
 The very first TCP message is sent by the Mainframe to the Icon:
 
@@ -106,9 +102,13 @@ This can be decoded as follow:
 
 According to the MIDI specifications, 0xFF is a MIDI reset message.
 
-### Others
+### Sysex Messages
 
-Now that we know the M6000 uses MIDI SysEx messages we can try to extrapolate from other TC devices, such as the  M-One (https://mediadl.musictribe.com/download/software/tcelectronic/tc_electronic_m-one_xl_midi_sysex_specifications.pdf) or D-two (https://mediadl.musictribe.com/download/software/tcelectronic/tc_electronic_d-two_midi_sysex_specifications.pdf)
+Now that we know the M6000 uses MIDI SysEx messages we can try to extrapolate from other TC devices:
+
+  - M-One: https://mediadl.musictribe.com/download/software/tcelectronic/tc_electronic_m-one_xl_midi_sysex_specifications.pdf
+  - D-two https://mediadl.musictribe.com/download/software/tcelectronic/tc_electronic_d-two_midi_sysex_specifications.pdf
+  - M3000 https://mediadl.musictribe.com/download/software/tcelectronic/tc_electronic_m3000_midi_sysex_specifications.pdf
 
 Other messages will typically look as follow:
 
@@ -121,13 +121,33 @@ This can be decoded as follow:
   - 000e : Block length
   - F0 ... F7 : MIDI SysEx data
 
-The SysEx Message can be decoded as:
+Those SysEx Message can be decoded as:
 
   - F0 : SysEx Start
   - 00 20 1F : "3 byte manufacturer ID for TC Electronic" (according to the D-Two spec)
   - 00 : System Exclusive device ID (User parameter set in "MIDI Setup Page")
-  - 46 : M6000 model ID (D-Two was 0x45, M-One was 0x44)
+  - 46 : M6000 model ID (M-One was 0x44, D-Two was 0x45)
   - 47 : Message Type
   - 06 7F 00 00 00 26 : Data
   - F7 : SysEnd Ends here
 
+### Parsing the SysEx messages
+
+The general SysEx message structure seems to match perfectly fine with the observed packets.
+Now, we need to properly interpret those depending on the Message Types.
+
+We can see that the M-One, D-Two and M3000 share most of the message type identifiers:
+
+	SYXTYPE_PRESETDATA    = 0x20
+	SYXTYPE_RHYTHMDATA    = 0x21
+	SYXTYPE_PARAMDATA     = 0x22
+	SYXTYPE_BANKREQUEST   = 0x40
+	SYXTYPE_PRESETRECALL  = 0x44
+	SYXTYPE_PRESETREQUEST = 0x45
+	SYXTYPE_RHYTHMREQUEST = 0x46
+	SYXTYPE_PARAMREQUEST  = 0x47
+
+When it comes to the message contents, observed data doesn't match with previous specifications. Usually, M6000 messages are too long.
+
+The M5000 documentation (https://data2.manualslib.com/pdf4/83/8276/827523-tc_electronic/m5000.pdf?48edcf2567a3317926d32a46822d089a&take=binary) shows a very different messages specifications. 
+Here the TC ID is set at 0x33 (instead of 0x00201F for the M-One, D-Two, M3000), followed by a device Id, the card identifier and a packet type between 0x00 and 0x07.

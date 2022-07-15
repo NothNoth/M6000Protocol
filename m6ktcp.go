@@ -19,7 +19,10 @@ func parseFrameToIconTCP(packet gopacket.Packet, ip *layers.IPv4, tcp *layers.TC
 	fmt.Println("------------------------------------------------------- Frame to Icon (tcp)")
 	fmt.Printf("Payload size: %d (0x%x) bytes\n", len(tcp.Payload), len(tcp.Payload))
 
-	blocks, truncatedFrameToIcon = parseBlock(tcp.Payload)
+	blocks, truncatedFrameToIcon = parseBlock(append(truncatedFrameToIcon, tcp.Payload...))
+	if len(truncatedFrameToIcon) != 0 {
+		fmt.Printf("!! Truncated block, %d bytes saved for later\n", len(truncatedFrameToIcon))
+	}
 	for _, b := range blocks {
 		fmt.Println(addToIndex(b))
 	}
@@ -33,7 +36,10 @@ func parseIconToFrameTCP(packet gopacket.Packet, ip *layers.IPv4, tcp *layers.TC
 	}
 	fmt.Println("------------------------------------------------------- Icon to Frame (tcp)")
 	fmt.Printf("Payload size: %d (0x%x) bytes\n", len(tcp.Payload), len(tcp.Payload))
-	blocks, truncatedIconToFrame = parseBlock(tcp.Payload)
+	blocks, truncatedIconToFrame = parseBlock(append(truncatedIconToFrame, tcp.Payload...))
+	if len(truncatedIconToFrame) != 0 {
+		fmt.Printf("!! Truncated block, %d bytes saved for later\n", len(truncatedIconToFrame))
+	}
 	for _, b := range blocks {
 		fmt.Println(addToIndex(b))
 	}
@@ -52,7 +58,6 @@ func parseBlock(payload []byte) ([]midiOverIPMessage, []byte) {
 	msg := 1
 	for {
 		if offs+4 > len(payload) {
-			fmt.Println("!!! TRUNCATED block")
 			return blockList, payload[offs:]
 		}
 		version := int(binary.BigEndian.Uint16(payload[offs : offs+2]))
@@ -63,8 +68,7 @@ func parseBlock(payload []byte) ([]midiOverIPMessage, []byte) {
 			blockList = append(blockList, midiOverIPMessage{msgIdx: msg, version: version, data: payload[offs : offs+size]})
 			//Note: on large packets, truncated message is found on the next packet
 		} else {
-			fmt.Println("!!! TRUNCATED block")
-			return blockList, payload[offs:]
+			return blockList, payload[offs-4:]
 		}
 		offs += size
 		if offs == len(payload) {
