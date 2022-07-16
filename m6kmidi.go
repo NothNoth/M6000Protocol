@@ -1,10 +1,8 @@
 package main
 
 import (
-	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
-	"os"
 )
 
 type MIDIMessage struct {
@@ -20,7 +18,7 @@ const (
 	SYXTYPE_RHYTHMREQUEST = 0x46 // 9 bytes messages
 
 	SYXTYPE_PARAMDATA    = 0x22
-	SYXTYPE_PARAMREQUEST = 0x47 // 6 bytes messages
+	SYXTYPE_PARAMREQUEST = 0x47
 
 	SYXTYPE_BANKREQUEST  = 0x40
 	SYXTYPE_PRESETRECALL = 0x44
@@ -29,13 +27,13 @@ const (
 	SYXTYPE_UNKNOWN_28 = 0x28 // 5 bytes messages
 	SYXTYPE_UNKNOWN_29 = 0x29 // 3 or 72 bytes messages
 	SYXTYPE_UNKNOWN_2F = 0x2F // variable message len
-	SYXTYPE_UNKNOWN_43 = 0x43
+	SYXTYPE_UNKNOWN_43 = 0x43 // 5 bytes messages
 	SYXTYPE_UNKNOWN_49 = 0x49 // 3 bytes messages
 	SYXTYPE_UNKNOWN_4A = 0x4A // 3 bytes messages
 	SYXTYPE_UNKNOWN_4F = 0x4F // 3 bytes messages
 
-	SYXTYPE_UNKNOWN_4E = 0x4E
-	SYXTYPE_UNKNOWN_2E = 0x2E
+	SYXTYPE_UNKNOWN_4E = 0x4E // variable message len
+	SYXTYPE_UNKNOWN_2E = 0x2E // 3 bytes messages
 )
 
 func messageTypeToString(msgType byte) string {
@@ -80,6 +78,21 @@ func messageTypeToString(msgType byte) string {
 	return "Unknown"
 }
 
+func midiTwoBytesTo14Bits(a byte, b byte) uint16 {
+	return ((uint16(a) & 0x7F) << 7) | uint16(b)
+}
+
+func midiToBytesToSigned14Bits(a byte, b byte) int16 {
+	var value int16
+
+	value = ((int16(a) & 0x7F) << 7) | int16(b)
+	if value&0x2000 == 1 { // "sign" bit is set?
+		value |= 0x2000 //erase it
+		return -value   //return negative value
+	}
+	return value
+}
+
 func (midiMsg MIDIMessage) String() string {
 	var str string
 
@@ -106,58 +119,37 @@ func (midiMsg MIDIMessage) String() string {
 	}
 	str += fmt.Sprintf("SysExDeviceID: 0x%02x | MessageType: 0x%02x (%s)\n", sysExDeviceID, messageType, messageTypeToString(messageType))
 
+	str += fmt.Sprintf("MessageData (%d bytes)\n", len(messageData))
+	str += hex.Dump(messageData)
+	str += "\n"
 	//Message Type dependant print
+	switch messageType {
+	case SYXTYPE_PARAMREQUEST:
+		engine := messageData[0]
+		paramId := messageData[1]
+		// unkA := messageData[2]
+		// unkB := messageData[3]
+		count := midiTwoBytesTo14Bits(messageData[4], messageData[5])
+		str += fmt.Sprintf("[Parsed] Param request for engine %d param: %d / Count: %d / Response size: %d\n", engine, paramId, count, count*2+4)
+
+	case SYXTYPE_PARAMDATA:
+		engine := messageData[0]
+		paramId := messageData[1]
+		// unkA := messageData[2]
+		// unkB := messageData[3]
+		str += fmt.Sprintf("[Parsed] Param data for engine %d param: %d\nValues:\n", engine, paramId)
+		for offs := 4; offs < len(messageData); offs += 2 {
+			value := midiToBytesToSigned14Bits(messageData[offs], messageData[offs+1])
+			str += fmt.Sprintf("0x%04x %+d (%c)\n", value, value, value)
+		}
+
+	}
 
 	/*
-		switch messageType {
-		case SYXTYPE_PRESETREQUEST: // M-One spec or D-Two
-			if len(messageData) != 2 {
-				str += "[Format length mismatch]"
-			}
-			presetMSB := messageData[0]
-			presetLSB := messageData[1]
-			preset := (uint16(presetMSB&0x7F) << 7) | uint16(presetLSB&0x7F)
-			str += fmt.Sprintf("Request preset %d\n", preset)
-		case SYXTYPE_PRESETDATA: // D-Two spec
-			//zero := messageData[6] // on M One
-			presetMSB := messageData[0]
-			presetLSB := messageData[1]
-			preset := (uint16(presetMSB&0x7F) << 7) | uint16(presetLSB&0x7F)
-			str += fmt.Sprintf("Preset Data for %d (TODO)\n", preset) // See D-Two spec page 2
-		case SYXTYPE_PARAMREQUEST: // M-One spec or D-Two
-			if len(messageData) != 2 {
-				str += "[Format length mismatch]"
-			}
-			engine := messageData[0]
-			paramId := messageData[1]
-			str += fmt.Sprintf("Param request for engine %d param: %d\n", engine, paramId)
-		case SYXTYPE_PARAMDATA: // M-One spec or D-Two
-			if len(messageData) != 4 {
-				str += "[Format length mismatch]"
-			}
-			engine := messageData[0]
-			paramId := messageData[1]
-			valuetMSB := messageData[2]
-			valueLSB := messageData[3]
-			value := (uint16(valuetMSB&0x7F) << 7) | uint16(valueLSB&0x7F)
-			str += fmt.Sprintf("Param data for engine %d param: %d has value %d\n", engine, paramId, value)
-
-		case SYXTYPE_RHYTHMREQUEST:
-			if len(messageData) != 0 {
-				str += "[Format length mismatch]"
-			}
-		case SYXTYPE_RHYTHMDATA:
-			if len(messageData) != 44 {
-				str += "[Format length mismatch] TODO"
-			}
-		}
+		h := sha1.Sum(messageData)
+		hs := hex.EncodeToString(h[:])
+		os.WriteFile(fmt.Sprintf("%02x_%s.bin", messageType, hs), messageData, 0777)
 	*/
 
-	str += "MessageData:\n"
-	str += hex.Dump(messageData)
-
-	h := sha1.Sum(messageData)
-	hs := hex.EncodeToString(h[:])
-	os.WriteFile(fmt.Sprintf("%02x_%s.bin", messageType, hs), messageData, 0777)
 	return str
 }

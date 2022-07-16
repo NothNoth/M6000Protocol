@@ -151,3 +151,33 @@ When it comes to the message contents, observed data doesn't match with previous
 
 The M5000 documentation (https://data2.manualslib.com/pdf4/83/8276/827523-tc_electronic/m5000.pdf?48edcf2567a3317926d32a46822d089a&take=binary) shows a very different messages specifications. 
 Here the TC ID is set at 0x33 (instead of 0x00201F for the M-One, D-Two, M3000), followed by a device Id, the card identifier and a packet type between 0x00 and 0x07.
+
+__0x22 and 0x47__
+According to the M-One/D-two/M3000 specs, this should be a Param Request query ad Param Data response.
+First byte should be engineID and second one the parameter identifier (paramID).
+We can observe on the traffic that each query on a given paramID if followed by a response on the same paramID.
+Thus, engineID and paramID could match with those specs.
+Nevertheless, the query is supposed to be 3 bytes long and we have 6 bytes long queries on the M6000.
+
+By analyzing the query / responses we can guess that:
+
+| Byte 0     | EngineID |
+| Byte 1     | ParamID  |
+| Byte 2     | Unknown  |
+| Byte 3     | Unknown  |
+| Byte 4 / 5 | Count  |
+
+_Example:_
+
+Request Data:  06 79 00 00 00 2a 
+Request on engine 06, parameter x79, two unknown zero bytes, count is 0x00|0x2a = 42x14bits values.
+
+Response Data (88 bytes):
+00000000  06 79 00 00 00 00 00 01  00 01 00 03 00 00 00 02  |.y..............|
+00000010  00 01 00 02 00 01 00 01  01 7f 01 7f 01 7f 00 01  |................|
+00000020  00 01 00 01 00 01 00 01  00 01 00 01 00 01 01 7f  |................|
+00000030  00 03 01 7f 00 01 00 02  01 7f 01 7f 01 7f 00 01  |................|
+00000040  00 01 00 01 00 03 00 02  00 02 00 02 00 02 01 7f  |................|
+00000050  00 02 01 7f 00 02 01 7f                           |........|
+Reponse for engine 06, parameter x79, followed by 42x14bits values (encoded into 84 bytes).
+
