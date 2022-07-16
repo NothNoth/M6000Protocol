@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -15,30 +14,6 @@ const (
 	tcFrameDetectionMagic = 0x12345678
 )
 
-type MIDIMessage struct {
-	data  []byte
-	count uint32
-}
-
-var index map[string]MIDIMessage
-
-func addToIndex(b midiOverIPMessage) MIDIMessage {
-	h := sha1.Sum(b.data)
-	hs := hex.EncodeToString(h[:])
-	blockIdx, found := index[hs]
-	if found {
-		blockIdx.count++
-		index[hs] = blockIdx
-		return blockIdx
-	} else {
-		blockIdx.count = 1
-		blockIdx.data = make([]byte, len(b.data))
-		copy(blockIdx.data, b.data)
-		index[hs] = blockIdx
-		return blockIdx
-	}
-}
-
 func main() {
 	if len(os.Args) != 4 {
 		fmt.Println("Usage: " + os.Args[0] + " <pcap file> <frame IP> <icon IP>")
@@ -49,8 +24,6 @@ func main() {
 	pcapFileName := os.Args[1]
 	frameIP := os.Args[2]
 	iconIP := os.Args[3]
-
-	index = make(map[string]MIDIMessage)
 
 	h, err := pcap.OpenOffline(pcapFileName)
 	if err != nil {

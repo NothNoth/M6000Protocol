@@ -18,13 +18,19 @@ func parseFrameToIconTCP(packet gopacket.Packet, ip *layers.IPv4, tcp *layers.TC
 	}
 	fmt.Println("------------------------------------------------------- Frame to Icon (tcp)")
 	fmt.Printf("Payload size: %d (0x%x) bytes\n", len(tcp.Payload), len(tcp.Payload))
+	//fmt.Println("Full pkt:")
+	//fmt.Println(hex.Dump(tcp.Payload))
 
 	blocks, truncatedFrameToIcon = parseBlock(append(truncatedFrameToIcon, tcp.Payload...))
 	if len(truncatedFrameToIcon) != 0 {
-		fmt.Printf("!! Truncated block, %d bytes saved for later\n", len(truncatedFrameToIcon))
+		fmt.Printf("[Warning] Truncated block, %d bytes saved for later\n", len(truncatedFrameToIcon))
+		//fmt.Println(hex.Dump(truncatedFrameToIcon))
 	}
+
 	for _, b := range blocks {
-		fmt.Println(addToIndex(b))
+		var m MIDIMessage
+		m.data = b.data
+		fmt.Println(m)
 	}
 
 }
@@ -36,12 +42,18 @@ func parseIconToFrameTCP(packet gopacket.Packet, ip *layers.IPv4, tcp *layers.TC
 	}
 	fmt.Println("------------------------------------------------------- Icon to Frame (tcp)")
 	fmt.Printf("Payload size: %d (0x%x) bytes\n", len(tcp.Payload), len(tcp.Payload))
+	//fmt.Println("Full pkt:")
+	//fmt.Println(hex.Dump(tcp.Payload))
 	blocks, truncatedIconToFrame = parseBlock(append(truncatedIconToFrame, tcp.Payload...))
 	if len(truncatedIconToFrame) != 0 {
-		fmt.Printf("!! Truncated block, %d bytes saved for later\n", len(truncatedIconToFrame))
+		fmt.Printf("[Warning] Truncated block, %d bytes saved for later\n", len(truncatedIconToFrame))
+		//fmt.Println(hex.Dump(truncatedFrameToIcon))
 	}
+
 	for _, b := range blocks {
-		fmt.Println(addToIndex(b))
+		var m MIDIMessage
+		m.data = b.data
+		fmt.Println(m)
 	}
 }
 
