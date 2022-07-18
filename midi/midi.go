@@ -3,29 +3,71 @@ package midi
 import (
 	"encoding/hex"
 	"fmt"
+	"log"
 	"m6kparse/common"
 )
 
 type MIDI struct {
+	logs                      *log.Logger
+	truncatedSysExFrameToIcon []byte
+	truncatedSysExIconToFrame []byte
 }
 
-func New() *MIDI {
-	var m MIDI
+type MIDIType int
 
+const (
+	MIDITypeReset MIDIType = iota
+	MIDITypeSysEx MIDIType = iota
+)
+
+type MIDIMessage struct {
+	data     []byte
+	midiType MIDIType
+}
+
+func New(logs *log.Logger) *MIDI {
+	var m MIDI
+	m.logs = logs
 	return &m
 }
 
 func (m *MIDI) Parse(midiData []byte, dir common.Direction) {
 	var msg MIDIMessage
 
-	msg.data = make([]byte, len(midiData))
-	copy(msg.data, midiData)
+	//Previous message was truncated, continue
+	if (dir == common.FrameToIcon) && (len(m.truncatedSysExFrameToIcon) != 0) {
+		msg.data = append(m.truncatedSysExFrameToIcon, midiData...)
+		m.truncatedSysExFrameToIcon = make([]byte, 0)
+	} else if (dir == common.IconToFrame) && (len(m.truncatedSysExIconToFrame) != 0) {
+		msg.data = append(m.truncatedSysExIconToFrame, midiData...)
+		m.truncatedSysExIconToFrame = make([]byte, 0)
+	} else {
+		msg.data = make([]byte, len(midiData))
+		copy(msg.data, midiData)
+	}
 
-	fmt.Println(msg)
-}
+	if msg.data[0] == 0xFF {
+		msg.midiType = MIDITypeReset
+	} else if msg.data[0] == 0xF0 {
+		if msg.data[len(msg.data)-1] == 0xF7 {
+			msg.midiType = MIDITypeSysEx
+		} else {
+			//Truncated SysEx
+			if dir == common.FrameToIcon {
+				m.truncatedSysExFrameToIcon = make([]byte, len(msg.data))
+				copy(m.truncatedSysExFrameToIcon, msg.data)
+			} else if dir == common.IconToFrame {
+				m.truncatedSysExIconToFrame = make([]byte, len(msg.data))
+				copy(m.truncatedSysExIconToFrame, msg.data)
+			}
+		}
+	}
 
-type MIDIMessage struct {
-	data []byte
+	switch msg.midiType {
+	case MIDITypeReset:
+
+	}
+	m.logs.Println(msg)
 }
 
 const (

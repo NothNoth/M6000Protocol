@@ -1,6 +1,7 @@
 package capture
 
 import (
+	"log"
 	"m6kparse/tcpparser"
 	"m6kparse/udpparser"
 	"time"
@@ -10,30 +11,43 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-func ReadLive(networkInterface string, iconIP string, frameIP string) error {
+type Capture struct {
+	logs      *log.Logger
+	udpParser *udpparser.UDPParser
+	tcpParser *tcpparser.TCPParser
+}
+
+func New(logs *log.Logger, iconIP string, frameIP string) *Capture {
+	var cap Capture
+
+	cap.logs = logs
+	cap.udpParser = udpparser.New(iconIP, frameIP, cap.logs)
+	cap.tcpParser = tcpparser.New(iconIP, frameIP, cap.logs)
+
+	return &cap
+}
+
+func (cap *Capture) ReadLive(networkInterface string) error {
 
 	h, err := pcap.OpenLive(networkInterface, 1500, true, 1*time.Millisecond)
 	if err != nil {
 		return err
 	}
 
-	return capturePackets(h, iconIP, frameIP)
+	return cap.capturePackets(h)
 }
 
-func ReadPcap(pcapFile string, iconIP string, frameIP string) error {
+func (cap *Capture) ReadPcap(pcapFile string) error {
 
 	h, err := pcap.OpenOffline(pcapFile)
 	if err != nil {
 		return err
 	}
 
-	return capturePackets(h, iconIP, frameIP)
+	return cap.capturePackets(h)
 }
 
-func capturePackets(h *pcap.Handle, iconIP string, frameIP string) error {
-
-	udpParser := udpparser.New(iconIP, frameIP)
-	tcpParser := tcpparser.New(iconIP, frameIP)
+func (cap *Capture) capturePackets(h *pcap.Handle) error {
 
 	packetSource := gopacket.NewPacketSource(h, h.LinkType())
 	for packet := range packetSource.Packets() {
@@ -54,9 +68,9 @@ func capturePackets(h *pcap.Handle, iconIP string, frameIP string) error {
 			}
 
 			if tcp != nil {
-				tcpParser.Parse(packet, ip, tcp)
+				cap.tcpParser.Parse(packet, ip, tcp)
 			} else if udp != nil {
-				udpParser.Parse(packet, ip, udp)
+				cap.udpParser.Parse(packet, ip, udp)
 			}
 		}
 	}

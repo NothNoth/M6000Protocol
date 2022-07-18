@@ -3,7 +3,7 @@ package tcpparser
 import (
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
+	"log"
 	"m6kparse/common"
 	"m6kparse/midi"
 
@@ -12,6 +12,7 @@ import (
 )
 
 type TCPParser struct {
+	logs                 *log.Logger
 	iconIP               string
 	frameIP              string
 	midiParser           *midi.MIDI
@@ -19,12 +20,13 @@ type TCPParser struct {
 	frameToIconTruncated []byte
 }
 
-func New(iconIP string, frameIP string) *TCPParser {
+func New(iconIP string, frameIP string, logs *log.Logger) *TCPParser {
 	var p TCPParser
 
 	p.iconIP = iconIP
 	p.frameIP = frameIP
-	p.midiParser = midi.New()
+	p.logs = logs
+	p.midiParser = midi.New(logs)
 	return &p
 }
 
@@ -82,7 +84,7 @@ func (p *TCPParser) parseBlocks(payload []byte, d common.Direction) {
 		} else if (d == common.FrameToIcon) && (len(p.frameToIconTruncated) != 0) {
 			midiData = append(p.frameToIconTruncated, midiData...)
 		}
-		fmt.Println(hex.Dump(midiData))
+		p.logs.Println(hex.Dump(midiData))
 		p.midiParser.Parse(midiData, d)
 		offs += size
 

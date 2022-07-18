@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"m6kparse/capture"
 	"os"
 )
@@ -34,10 +35,16 @@ func main() {
 	mode := os.Args[3]
 	source := os.Args[4]
 
+	f, _ := os.Create("output.log")
+	logs := log.New(f, "M6kParser", log.Lshortfile)
+	defer f.Close()
+
+	cap := capture.New(logs, iconIP, frameIP)
+
 	if mode == "-live" {
-		err = capture.ReadLive(source, iconIP, frameIP)
+		err = cap.ReadLive(source)
 	} else if mode == "-pcap" {
-		err = capture.ReadPcap(source, iconIP, frameIP)
+		err = cap.ReadPcap(source)
 	} else {
 		help()
 		err = errors.New("Invalid arguments")
