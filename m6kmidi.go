@@ -127,17 +127,17 @@ func (midiMsg MIDIMessage) String() string {
 	case SYXTYPE_PARAMREQUEST:
 		engine := messageData[0]
 		paramId := messageData[1]
-		// unkA := messageData[2]
-		// unkB := messageData[3]
+		unkA := messageData[2]
+		unkB := messageData[3]
 		count := midiTwoBytesTo14Bits(messageData[4], messageData[5])
-		str += fmt.Sprintf("[Parsed] Param request for engine %d param: %d / Count: %d / Response size: %d\n", engine, paramId, count, count*2+4)
+		str += fmt.Sprintf("[Parsed] Param request for engine %d param: %d / Count: %d / Response size: %d [unkA/B : x%02x x%02x]\n", engine, paramId, count, count*2+4, unkA, unkB)
 
 	case SYXTYPE_PARAMDATA:
 		engine := messageData[0]
 		paramId := messageData[1]
-		// unkA := messageData[2]
-		// unkB := messageData[3]
-		str += fmt.Sprintf("[Parsed] Param data for engine %d param: %d\nValues:\n", engine, paramId)
+		unkA := messageData[2]
+		unkB := messageData[3]
+		str += fmt.Sprintf("[Parsed] Param data for engine %d param: %d  [unkA/B : x%02x x%02x]\nValues:\n", engine, paramId, unkA, unkB)
 		for offs := 4; offs < len(messageData); offs += 2 {
 			value := midiToBytesToSigned14Bits(messageData[offs], messageData[offs+1])
 			str += fmt.Sprintf("0x%04x %+d (%c)\n", value, value, value)
