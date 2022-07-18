@@ -1,9 +1,28 @@
-package main
+package midi
 
 import (
 	"encoding/hex"
 	"fmt"
+	"m6kparse/common"
 )
+
+type MIDI struct {
+}
+
+func New() *MIDI {
+	var m MIDI
+
+	return &m
+}
+
+func (m *MIDI) Parse(midiData []byte, dir common.Direction) {
+	var msg MIDIMessage
+
+	msg.data = make([]byte, len(midiData))
+	copy(msg.data, midiData)
+
+	fmt.Println(msg)
+}
 
 type MIDIMessage struct {
 	data []byte
@@ -93,13 +112,25 @@ func midiToBytesToSigned14Bits(a byte, b byte) int16 {
 	return value
 }
 
+var split []byte
+
 func (midiMsg MIDIMessage) String() string {
 	var str string
 
 	if midiMsg.data[0] == 0xFF {
 		return "MIDI Reset message"
 	}
+	/*
+	   //FIXME
+	   	if len(split) != 0 {
+	   		midiMsg.data = append(split, midiMsg.data...)
+	   		split = make([]byte, 0)
+	   		str += fmt.Sprintf("reuse %d bytes\n", len(split))
+	   	}
+	*/
 	if (midiMsg.data[0] != 0xF0) || (midiMsg.data[len(midiMsg.data)-1] != 0xF7) {
+		split = make([]byte, len(midiMsg.data))
+		copy(split, midiMsg.data)
 		return "[Error] Not a SysEx message:" + hex.Dump(midiMsg.data)
 	}
 	msg := midiMsg.data[1 : len(midiMsg.data)-1]
@@ -138,11 +169,13 @@ func (midiMsg MIDIMessage) String() string {
 		unkA := messageData[2]
 		unkB := messageData[3]
 		str += fmt.Sprintf("[Parsed] Param data for engine %d param: %d  [unkA/B : x%02x x%02x]\nValues:\n", engine, paramId, unkA, unkB)
-		for offs := 4; offs < len(messageData); offs += 2 {
-			value := midiToBytesToSigned14Bits(messageData[offs], messageData[offs+1])
-			str += fmt.Sprintf("0x%04x %+d (%c)\n", value, value, value)
-		}
 
+		/*
+			for offs := 4; offs < len(messageData); offs += 2 {
+				value := midiToBytesToSigned14Bits(messageData[offs], messageData[offs+1])
+				str += fmt.Sprintf("0x%04x %+d (%c)\n", value, value, value)
+			}
+		*/
 	}
 
 	/*

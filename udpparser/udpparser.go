@@ -1,4 +1,4 @@
-package main
+package udpparser
 
 import (
 	"encoding/binary"
@@ -8,6 +8,45 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )
+
+type UDPParser struct {
+	iconIP  string
+	frameIP string
+}
+
+const (
+	tcFrameDetectionMagic = 0x12345678
+)
+
+func New(iconIP string, frameIP string) *UDPParser {
+	var p UDPParser
+
+	p.iconIP = iconIP
+	p.frameIP = frameIP
+
+	return &p
+}
+
+func (p *UDPParser) Parse(packet gopacket.Packet, ip *layers.IPv4, udp *layers.UDP) {
+
+	if (ip.SrcIP.String() == p.frameIP) && (ip.DstIP.String() == p.iconIP) {
+		parseFrameToIconUDP(packet, ip, udp)
+		return
+	}
+
+	if (ip.SrcIP.String() == p.iconIP) && (ip.DstIP.String() == p.frameIP) {
+		parseIconToFrameUDP(packet, ip, udp)
+		return
+	}
+
+	if (ip.SrcIP.String() == p.iconIP) && (ip.DstIP[3] == 255) {
+		parseIconToBroadcastUDP(packet, ip, udp)
+		return
+	}
+
+	fmt.Println("[UDP] Unknown traffic:")
+	fmt.Println(hex.Dump(packet.Data()))
+}
 
 func parseFrameToIconUDP(packet gopacket.Packet, ip *layers.IPv4, udp *layers.UDP) {
 	magic := binary.BigEndian.Uint32(udp.Payload[0:4])
