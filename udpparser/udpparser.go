@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"log"
+	"strings"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -30,6 +31,14 @@ func New(iconIP string, frameIP string, logs *log.Logger) *UDPParser {
 }
 
 func (p *UDPParser) Parse(packet gopacket.Packet, ip *layers.IPv4, udp *layers.UDP) {
+	if udp.DstPort == 137 || udp.DstPort == 138 {
+		//Ignore all netbios stuff
+		return
+	}
+
+	p.logs.Println("************************************************************")
+	p.logs.Printf("[UDP Packet] RAW Payload %d bytes (0x%d)\n", len(udp.Payload), len(udp.Payload))
+	p.logs.Print("\n" + hex.Dump(udp.Payload))
 
 	if (ip.SrcIP.String() == p.frameIP) && (ip.DstIP.String() == p.iconIP) {
 		p.parseFrameToIconUDP(packet, ip, udp)
@@ -45,30 +54,29 @@ func (p *UDPParser) Parse(packet gopacket.Packet, ip *layers.IPv4, udp *layers.U
 		p.parseIconToBroadcastUDP(packet, ip, udp)
 		return
 	}
-
-	p.logs.Println("[UDP] Unknown traffic:")
-	p.logs.Println(hex.Dump(packet.Data()))
+	p.logs.Println("-> Unknown traffic!")
 }
 
 func (p *UDPParser) parseFrameToIconUDP(packet gopacket.Packet, ip *layers.IPv4, udp *layers.UDP) {
 	magic := binary.BigEndian.Uint32(udp.Payload[0:4])
 	if magic != tcFrameDetectionMagic {
-		//Otehr UDP packets are Timeframes sent from Frame to Icon.
+		//Other UDP packets are Timeframes sent from Frame to Icon.
 		return
 	}
-	p.logs.Println("------------------------------------------------------- Frame to icon (udp)")
-	p.logs.Printf("Payload size: %d (0x%x) bytes\n", len(udp.Payload), len(udp.Payload))
-	p.logs.Println(hex.Dump(udp.Payload))
+	p.logs.Println("-> Frame to icon (udp)")
 
 	frameSerial := binary.BigEndian.Uint32(udp.Payload[4:8])
 	totalMsg := udp.Payload[8] //not sure
 	unknownA := udp.Payload[0x9:0x10]
 	currentMsg := udp.Payload[0x13] //not sure
 	fileName := string(udp.Payload[0x14:0x27])
+	fileName = strings.Trim(fileName, "\x00")
 	deviceName := string(udp.Payload[0x54:0x67])
+	deviceName = strings.Trim(deviceName, "\x00")
+
 	p.logs.Println("  Serial: ", frameSerial)
 	p.logs.Printf("  Message: %d/%d\n", currentMsg+1, totalMsg)
-	p.logs.Println(hex.Dump(unknownA))
+	p.logs.Print("\n" + hex.Dump(unknownA))
 	p.logs.Println("  Filename: " + fileName)
 	p.logs.Println("  DeviceName: " + deviceName)
 }
@@ -78,37 +86,26 @@ func (p *UDPParser) parseIconToFrameUDP(packet gopacket.Packet, ip *layers.IPv4,
 	if magic != tcFrameDetectionMagic {
 		return
 	}
-	p.logs.Println("------------------------------------------------------- Icon to Frame (udp)")
 
-	if magic == tcFrameDetectionMagic {
-		p.logs.Println("Icon response to frame")
-		p.logs.Println(hex.Dump(udp.Payload))
-		command := string(udp.Payload[4:16])
-		p.logs.Println("  Icon command " + command)
-	}
+	p.logs.Println("-> Icon to frame")
+	command := string(udp.Payload[4:15])
+	command = strings.Trim(command, "\x00")
+
+	p.logs.Println("-> Icon command " + command)
 }
 
 func (p *UDPParser) parseIconToBroadcastUDP(packet gopacket.Packet, ip *layers.IPv4, udp *layers.UDP) {
 
-	if udp.DstPort == 137 || udp.DstPort == 138 {
-		//Ignore all netbios stuff
-		return
-	}
-	p.logs.Println("-------------------------------------------------------")
-
-	/*
-		p.logs.Println(packet)
-		p.logs.Printf("Payload size: %d (0x%x) bytes\n", len(udp.Payload), len(udp.Payload))
-		p.logs.Println(hex.Dump(udp.Payload))
-	*/
+	p.logs.Println("-> Icon broadcast")
 	magic := binary.BigEndian.Uint32(udp.Payload[0:4])
 	if magic != tcFrameDetectionMagic {
-		p.logs.Printf("--> Invalid TC Magic: 0x%08x\n", magic)
+		p.logs.Printf("-> Invalid TC Magic: 0x%08x\n", magic)
 		return
 	}
 	name := string(udp.Payload[4:16])
-	p.logs.Println("Icon detect message:")
+	name = strings.Trim(name, "\x00")
+	p.logs.Println("Icon detect probe:")
 	p.logs.Printf("  Magic %08x\n", magic)
 	p.logs.Println("  Name: " + name)
-	p.logs.Println(hex.Dump(udp.Payload[16:]))
+	p.logs.Print("\n" + hex.Dump(udp.Payload[16:]))
 }

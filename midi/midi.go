@@ -34,13 +34,17 @@ func New(logs *log.Logger) *MIDI {
 func (m *MIDI) Parse(midiData []byte, dir common.Direction) {
 	var msg MIDIMessage
 
-	//Previous message was truncated, continue
+	//Previous message was truncated, reuse and continue
 	if (dir == common.FrameToIcon) && (len(m.truncatedSysExFrameToIcon) != 0) {
-		msg.data = append(m.truncatedSysExFrameToIcon, midiData...)
-		m.truncatedSysExFrameToIcon = make([]byte, 0)
+		merged := append(m.truncatedSysExFrameToIcon, midiData...)
+		msg.data = make([]byte, len(merged))
+		copy(msg.data, merged)
+		m.truncatedSysExFrameToIcon = nil
 	} else if (dir == common.IconToFrame) && (len(m.truncatedSysExIconToFrame) != 0) {
-		msg.data = append(m.truncatedSysExIconToFrame, midiData...)
-		m.truncatedSysExIconToFrame = make([]byte, 0)
+		merged := append(m.truncatedSysExIconToFrame, midiData...)
+		msg.data = make([]byte, len(merged))
+		copy(msg.data, merged)
+		m.truncatedSysExIconToFrame = nil
 	} else {
 		msg.data = make([]byte, len(midiData))
 		copy(msg.data, midiData)
@@ -49,10 +53,11 @@ func (m *MIDI) Parse(midiData []byte, dir common.Direction) {
 	if msg.data[0] == 0xFF {
 		msg.midiType = MIDITypeReset
 	} else if msg.data[0] == 0xF0 {
+
 		if msg.data[len(msg.data)-1] == 0xF7 {
 			msg.midiType = MIDITypeSysEx
 		} else {
-			//Truncated SysEx
+			//Truncated SysEx, save for later
 			if dir == common.FrameToIcon {
 				m.truncatedSysExFrameToIcon = make([]byte, len(msg.data))
 				copy(m.truncatedSysExFrameToIcon, msg.data)
@@ -60,13 +65,13 @@ func (m *MIDI) Parse(midiData []byte, dir common.Direction) {
 				m.truncatedSysExIconToFrame = make([]byte, len(msg.data))
 				copy(m.truncatedSysExIconToFrame, msg.data)
 			}
+			return
 		}
+	} else {
+		m.logs.Println("[WARN] Totally unknown message:" + hex.Dump(msg.data))
+		return
 	}
 
-	switch msg.midiType {
-	case MIDITypeReset:
-
-	}
 	m.logs.Println(msg)
 }
 
@@ -154,25 +159,14 @@ func midiToBytesToSigned14Bits(a byte, b byte) int16 {
 	return value
 }
 
-var split []byte
-
 func (midiMsg MIDIMessage) String() string {
 	var str string
 
 	if midiMsg.data[0] == 0xFF {
 		return "MIDI Reset message"
 	}
-	/*
-	   //FIXME
-	   	if len(split) != 0 {
-	   		midiMsg.data = append(split, midiMsg.data...)
-	   		split = make([]byte, 0)
-	   		str += fmt.Sprintf("reuse %d bytes\n", len(split))
-	   	}
-	*/
+
 	if (midiMsg.data[0] != 0xF0) || (midiMsg.data[len(midiMsg.data)-1] != 0xF7) {
-		split = make([]byte, len(midiMsg.data))
-		copy(split, midiMsg.data)
 		return "[Error] Not a SysEx message:" + hex.Dump(midiMsg.data)
 	}
 	msg := midiMsg.data[1 : len(midiMsg.data)-1]

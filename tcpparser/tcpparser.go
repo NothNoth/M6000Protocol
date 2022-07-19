@@ -32,9 +32,18 @@ func New(iconIP string, frameIP string, logs *log.Logger) *TCPParser {
 
 func (p *TCPParser) Parse(packet gopacket.Packet, ip *layers.IPv4, tcp *layers.TCP) {
 
+	if len(tcp.Payload) == 0 {
+		return
+	}
+	p.logs.Println("************************************************************")
+	p.logs.Printf("[TCP Packet] RAW Payload %d bytes (0x%d)\n", len(tcp.Payload), len(tcp.Payload))
+	p.logs.Print("\n" + hex.Dump(tcp.Payload))
+
 	if (ip.SrcIP.String() == p.frameIP) && (ip.DstIP.String() == p.iconIP) {
+		p.logs.Println("-> Frame to icon (tcp)")
 		p.parseBlocks(tcp.Payload, common.FrameToIcon)
 	} else if (ip.SrcIP.String() == p.iconIP) && (ip.DstIP.String() == p.frameIP) {
+		p.logs.Println("-> Icon to frame (tcp)")
 		p.parseBlocks(tcp.Payload, common.IconToFrame)
 	}
 }
@@ -42,6 +51,17 @@ func (p *TCPParser) Parse(packet gopacket.Packet, ip *layers.IPv4, tcp *layers.T
 func (p *TCPParser) parseBlocks(payload []byte, d common.Direction) {
 	offs := 0
 	msg := 1
+
+	//If data was truncated on previous packet, prepend saved
+	if (d == common.IconToFrame) && (len(p.iconToFrameTruncated) != 0) {
+		merged := append(p.iconToFrameTruncated, payload...)
+		payload = make([]byte, len(merged))
+		copy(payload, merged)
+	} else if (d == common.FrameToIcon) && (len(p.frameToIconTruncated) != 0) {
+		merged := append(p.frameToIconTruncated, payload...)
+		payload = make([]byte, len(merged))
+		copy(payload, merged)
+	}
 
 	for {
 		//Not enough room for a complete block?
@@ -79,12 +99,7 @@ func (p *TCPParser) parseBlocks(payload []byte, d common.Direction) {
 		}
 
 		midiData := payload[offs : offs+size]
-		if (d == common.IconToFrame) && (len(p.iconToFrameTruncated) != 0) {
-			midiData = append(p.iconToFrameTruncated, midiData...)
-		} else if (d == common.FrameToIcon) && (len(p.frameToIconTruncated) != 0) {
-			midiData = append(p.frameToIconTruncated, midiData...)
-		}
-		p.logs.Println(hex.Dump(midiData))
+		//p.logs.Println(hex.Dump(midiData))
 		p.midiParser.Parse(midiData, d)
 		offs += size
 
