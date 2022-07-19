@@ -54,10 +54,12 @@ func (p *TCPParser) parseBlocks(payload []byte, d common.Direction) {
 
 	//If data was truncated on previous packet, prepend saved
 	if (d == common.IconToFrame) && (len(p.iconToFrameTruncated) != 0) {
+		p.logs.Printf("-> Reusing %d bytes from previously truncated packet\n", len(p.iconToFrameTruncated))
 		merged := append(p.iconToFrameTruncated, payload...)
 		payload = make([]byte, len(merged))
 		copy(payload, merged)
 	} else if (d == common.FrameToIcon) && (len(p.frameToIconTruncated) != 0) {
+		p.logs.Printf("-> Reusing %d bytes from previously truncated packet\n", len(p.frameToIconTruncated))
 		merged := append(p.frameToIconTruncated, payload...)
 		payload = make([]byte, len(merged))
 		copy(payload, merged)
@@ -69,12 +71,15 @@ func (p *TCPParser) parseBlocks(payload []byte, d common.Direction) {
 			if d == common.IconToFrame {
 				p.iconToFrameTruncated = make([]byte, len(payload)-offs)
 				copy(p.iconToFrameTruncated, payload[offs:])
+				p.logs.Printf("-> Saving %d bytes of truncated data for next packet\n", len(p.iconToFrameTruncated))
 				return
 			} else if d == common.FrameToIcon {
 				p.frameToIconTruncated = make([]byte, len(payload)-offs)
 				copy(p.frameToIconTruncated, payload[offs:])
+				p.logs.Printf("-> Saving %d bytes of truncated data for next packet\n", len(p.frameToIconTruncated))
 				return
 			}
+			p.logs.Fatalln("Unknown TCP direction!")
 			return
 		}
 
@@ -83,25 +88,32 @@ func (p *TCPParser) parseBlocks(payload []byte, d common.Direction) {
 		size := int(binary.BigEndian.Uint16(payload[offs : offs+2]))
 		offs += 2
 
+		//Not enough room
 		if offs+size > len(payload) {
-			//Not enough room
 			offs -= 4
 			if d == common.IconToFrame {
 				p.iconToFrameTruncated = make([]byte, len(payload)-offs)
 				copy(p.iconToFrameTruncated, payload[offs:])
+				p.logs.Printf("-> Saving %d bytes of truncated data for next packet\n", len(p.iconToFrameTruncated))
 				return
 			} else if d == common.FrameToIcon {
 				p.frameToIconTruncated = make([]byte, len(payload)-offs)
 				copy(p.frameToIconTruncated, payload[offs:])
+				p.logs.Printf("-> Saving %d bytes of truncated data for next packet\n", len(p.frameToIconTruncated))
 				return
 			}
+			p.logs.Fatalln("Unknown TCP direction!")
 			return
 		}
 
-		midiData := payload[offs : offs+size]
-		//p.logs.Println(hex.Dump(midiData))
-		p.midiParser.Parse(midiData, d)
-		offs += size
+		if size != 0 {
+			midiData := payload[offs : offs+size]
+			//p.logs.Println(hex.Dump(midiData))
+			p.midiParser.Parse(midiData, d)
+			offs += size
+		} else {
+			p.logs.Println("[WARN] Empty block found")
+		}
 
 		//Reached the end
 		if offs == len(payload) {
