@@ -58,11 +58,13 @@ func (p *TCPParser) parseBlocks(payload []byte, d common.Direction) {
 		merged := append(p.iconToFrameTruncated, payload...)
 		payload = make([]byte, len(merged))
 		copy(payload, merged)
+		p.iconToFrameTruncated = make([]byte, 0)
 	} else if (d == common.FrameToIcon) && (len(p.frameToIconTruncated) != 0) {
 		p.logs.Printf("-> Reusing %d bytes from previously truncated packet\n", len(p.frameToIconTruncated))
 		merged := append(p.frameToIconTruncated, payload...)
 		payload = make([]byte, len(merged))
 		copy(payload, merged)
+		p.frameToIconTruncated = make([]byte, 0)
 	}
 
 	for {

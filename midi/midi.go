@@ -106,8 +106,12 @@ const (
 	SYXTYPE_UNKNOWN_4A = 0x4A // 3 bytes messages
 	SYXTYPE_UNKNOWN_4F = 0x4F // 3 bytes messages
 
-	SYXTYPE_UNKNOWN_4E = 0x4E // variable message len
-	SYXTYPE_UNKNOWN_2E = 0x2E // 3 bytes messages
+	SYXTYPE_CODECMD          = 0x4E // variable message len
+	SYXTYPE_CODECMD_RESPONSE = 0x2E // 3 bytes messages
+
+	SYXTYPE_PRESETCMD_4C = 0x4C // possible preset command from icon
+	SYXTYPE_MEDIACMD_4D  = 0x4D // possible media command from icon
+
 )
 
 func messageTypeToString(msgType byte) string {
@@ -134,8 +138,8 @@ func messageTypeToString(msgType byte) string {
 		return "Frame to icon unknown 28"
 	case SYXTYPE_UNKNOWN_29:
 		return "Frame to icon unknown 29"
-	case SYXTYPE_UNKNOWN_2E:
-		return "Frame to icon unknown 2E (Licence?)"
+	case SYXTYPE_CODECMD:
+		return "Frame to icon code command (Licence?)"
 	case SYXTYPE_UNKNOWN_2F:
 		return "Frame to icon unknown 2F"
 	case SYXTYPE_UNKNOWN_43:
@@ -144,10 +148,14 @@ func messageTypeToString(msgType byte) string {
 		return "Icon to frame unknown 49"
 	case SYXTYPE_UNKNOWN_4A:
 		return "Icon to frame unknown 4A"
-	case SYXTYPE_UNKNOWN_4E:
-		return "Icon to frame unknown 4E (Licence?)"
+	case SYXTYPE_CODECMD_RESPONSE:
+		return "Icon to frame code command reply (Licence?)"
 	case SYXTYPE_UNKNOWN_4F:
 		return "Icon to frame unknown 4F"
+	case SYXTYPE_PRESETCMD_4C:
+		return "Icon to frame possible preset command"
+	case SYXTYPE_MEDIACMD_4D:
+		return "Icon to frame possible media command"
 	}
 	return "Unknown"
 }
@@ -214,12 +222,16 @@ func (midiMsg MIDIMessage) String() string {
 		unkB := messageData[3]
 		str += fmt.Sprintf("[Parsed] Param data for engine %d param: %d  [unkA/B : x%02x x%02x]\nValues:\n", engine, paramId, unkA, unkB)
 
-		/*
-			for offs := 4; offs < len(messageData); offs += 2 {
-				value := midiToBytesToSigned14Bits(messageData[offs], messageData[offs+1])
-				str += fmt.Sprintf("0x%04x %+d (%c)\n", value, value, value)
-			}
-		*/
+	/*
+		for offs := 4; offs < len(messageData); offs += 2 {
+			value := midiToBytesToSigned14Bits(messageData[offs], messageData[offs+1])
+			str += fmt.Sprintf("0x%04x %+d (%c)\n", value, value, value)
+		}
+	*/
+	case SYXTYPE_CODECMD:
+		str += midiMsg.parseLicenceCode(messageData)
+	case SYXTYPE_CODECMD_RESPONSE:
+		str += midiMsg.parseLicenceCodeResponse(messageData)
 	}
 
 	/*
@@ -229,4 +241,66 @@ func (midiMsg MIDIMessage) String() string {
 	*/
 
 	return str
+}
+
+func (midiMsg MIDIMessage) parseLicenceCode(msg []byte) string {
+
+	//unk1 := msg[0]
+	//fixed7F := msg[1]
+
+	var code string
+
+	offs := 2
+	for {
+		var ascii byte
+		if offs+1 >= len(msg) {
+			break
+		}
+
+		A := msg[offs]
+		B := msg[offs+1]
+
+		ascii = (A << 4) | (B & 0xF) // strings are encoded into 2 bytes per character (1 nibble per byte)
+		code += string([]byte{ascii})
+		offs += 2
+	}
+
+	return "Send code " + code + " to frame for validation"
+}
+
+func (midiMsg MIDIMessage) parseLicenceCodeResponse(msg []byte) string {
+	if len(msg) != 3 {
+		return "Unexpected Code response length"
+	}
+
+	result := msg[2]
+
+	switch result {
+	case 0:
+		return "Code validation response 'Success'"
+
+		/*
+			1 = 00713658 + 1*4 = 0071365C => 70FB30 An unspecified error occured
+			2 = 00713658 + 2*4 = 00713660 => 71363C Code length is invalid
+			3 = 00713658 + 3*4 = 00713664 => 713620 Code identifier is invalid
+			4 = 00713658 + 4*4 = 00713668 => 713608 Code level is invalid
+			5 = 00713658 + 5*4 = 0071366C => 7135EC Code checksum is invalid
+			6 = 00713658 + 6*4 = 00713670 => 7135D0 Device EEPROM is invalid
+		*/
+
+	case 1: //Any invalid error code defaults to this
+		return "Code validation response 'An unspecified error occured'"
+	case 2:
+		return "Code validation response 'Code length is invalid'"
+	case 3:
+		return "Code validation response 'Code identifier is invalid'"
+	case 4:
+		return "Code validation response 'Code level is invalid'"
+	case 5:
+		return "Code validation response 'Code checksum is invalid'"
+	case 6:
+		return "Code validation response 'Device EEPROM is invalid'"
+	default:
+		return fmt.Sprintf("Code validation response unknown 0x%02x", result)
+	}
 }
