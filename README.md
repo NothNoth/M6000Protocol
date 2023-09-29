@@ -18,7 +18,7 @@ The Icon unit is technically a Windows NT4 PC, thus it will use some well known 
 Upon startup, the Icon declares itself on the NetBIOS UDP service.
 Since we're not interested on this part of the traffic, this will be mostly ignored here.
 
-In wireshark, we would typically the followinf filter in order to focus on the actual M6000 traffic:
+In wireshark, we would typically the following filter in order to focus on the actual M6000 traffic:
 
     ip.addr == 192.168.1.125 and ((udp.port != 137 and udp.port != 138) or tcp)
 
@@ -153,7 +153,7 @@ The M5000 documentation (https://data2.manualslib.com/pdf4/83/8276/827523-tc_ele
 Here the TC ID is set at 0x33 (instead of 0x00201F for the M-One, D-Two, M3000), followed by a device Id, the card identifier and a packet type between 0x00 and 0x07.
 
 __0x22 and 0x47__
-According to the M-One/D-two/M3000 specs, this should be a Param Request query ad Param Data response.
+According to the M-One/D-two/M3000 specs, this should be a Param Request query and Param Data response.
 First byte should be engineID and second one the parameter identifier (paramID).
 We can observe on the traffic that each query on a given paramID if followed by a response on the same paramID.
 Thus, engineID and paramID could match with those specs.
