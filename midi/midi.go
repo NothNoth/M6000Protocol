@@ -49,14 +49,14 @@ func (m *MIDI) Parse(midiData []byte, dir common.Direction) {
 		msg.data = make([]byte, len(merged))
 		copy(msg.data, merged)
 		m.truncatedSysExFrameToIcon = nil
-		m.logs.Println("-> SysEx is now:\n ", hex.Dump(msg.data))
+		//m.logs.Println("-> SysEx is now:\n ", hex.Dump(msg.data))
 	} else if (dir == common.IconToFrame) && (len(m.truncatedSysExIconToFrame) != 0) {
 		m.logs.Printf("-> Reusing %d bytes from previously truncated SysEx message\n", len(m.truncatedSysExIconToFrame))
 		merged := append(m.truncatedSysExIconToFrame, midiData...)
 		msg.data = make([]byte, len(merged))
 		copy(msg.data, merged)
 		m.truncatedSysExIconToFrame = nil
-		m.logs.Println("-> SysEx is now:\n ", hex.Dump(msg.data))
+		//m.logs.Println("-> SysEx is now:\n ", hex.Dump(msg.data))
 	} else {
 		msg.data = make([]byte, len(midiData))
 		copy(msg.data, midiData)
@@ -69,7 +69,7 @@ func (m *MIDI) Parse(midiData []byte, dir common.Direction) {
 		if msg.data[len(msg.data)-1] == 0xF7 {
 			msg.midiType = MIDITypeSysEx
 		} else {
-			m.logs.Printf("-> Saving %d bytes of truncated SysEx message for next time\n", len(msg.data))
+			//m.logs.Printf("-> Saving %d bytes of truncated SysEx message for next time\n", len(msg.data))
 
 			//Truncated SysEx, save for later
 			if dir == common.FrameToIcon {

@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"os"
 	"strconv"
-	"time"
 )
 
 func (midiMsg MIDIMessage) parseParamRequest(messageData []byte) string {
@@ -14,7 +13,7 @@ func (midiMsg MIDIMessage) parseParamRequest(messageData []byte) string {
 	unkA := messageData[2]
 	unkB := messageData[3]
 	count := midiTwoBytesTo14Bits(messageData[4], messageData[5])
-	return fmt.Sprintf("[Parsed] Param request for engine %d param: %d / Count: %d / Response size: %d [unkA/B : x%02x x%02x]\n", engine, paramId, count, count*2+4, unkA, unkB)
+	return fmt.Sprintf("[Parsed] Param request for engine %d %d parameters starting from param: %d/ Response size: %d [unkA/B : x%02x x%02x]\n", engine, count, paramId, count*2+4, unkA, unkB)
 }
 
 func (midiMsg MIDIMessage) parseParamData(messageData []byte) string {
@@ -28,9 +27,9 @@ func (midiMsg MIDIMessage) parseParamData(messageData []byte) string {
 	for offs := 4; offs < len(messageData); offs += 2 {
 		value := midiTwoBytesTo8Bits(messageData[offs], messageData[offs+1])
 		if strconv.IsPrint(rune(value)) {
-			str += fmt.Sprintf("0x%04x %+d (%c)\n", value, value, value)
+			str += fmt.Sprintf("[%02x %02x] 0x%04x %+d (%c)\n", messageData[offs], messageData[offs+1], value, value, value)
 		} else {
-			str += fmt.Sprintf("0x%04x %+d ( )\n", value, value)
+			str += fmt.Sprintf("[%02x %02x] 0x%04x %+d ( )\n", messageData[offs], messageData[offs+1], value, value)
 		}
 	}
 
@@ -44,15 +43,36 @@ func (midiMsg MIDIMessage) parsePresetRequest(messageData []byte) string {
 }
 
 func (midiMsg MIDIMessage) parsePresetData(messageData []byte) string {
-	rand.Seed(time.Now().Unix())
+	offset := 0
+
+	if len(messageData) < 3 {
+		return "Truncated preset data"
+	}
+
 	//Two first bytes are preset number
 	presetNumber := uint16(messageData[1])<<8 | uint16(messageData[0])
+	offset += 2
+
+	//Unknown byte (0x00)
+	unkA := messageData[offset]
+	offset++
 
 	rnd := rand.Intn(9999)
 	tmpFileName := fmt.Sprintf("presetdata-%d.dat", rnd)
-
 	os.WriteFile(tmpFileName, messageData, 0755)
-	return fmt.Sprintf("Preset %d dump to %s\n", presetNumber, tmpFileName)
+
+	f, err := os.Create(tmpFileName + "a")
+	if err != nil {
+		fmt.Println(err)
+		return ""
+	}
+	for i := offset; i < len(messageData); i += 2 {
+		b := ((messageData[i]) << 4) | messageData[i+1]
+		f.Write([]byte{b})
+	}
+	f.Close()
+
+	return fmt.Sprintf("Preset %d dump to %s (unkA:%d)\n", presetNumber, tmpFileName, unkA)
 }
 
 func (midiMsg MIDIMessage) parseLicenceCode(msg []byte) string {
