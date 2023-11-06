@@ -229,6 +229,8 @@ func (midiMsg MIDIMessage) String() string {
 		str += midiMsg.parsePresetRequest(messageData)
 	case SYXTYPE_PRESETDATA:
 		str += midiMsg.parsePresetData(messageData)
+	default:
+		str += midiMsg.parseUnknown(messageData)
 	}
 
 	/*

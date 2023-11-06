@@ -1,6 +1,7 @@
 package midi
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"os"
@@ -43,6 +44,40 @@ func (midiMsg MIDIMessage) parsePresetRequest(messageData []byte) string {
 }
 
 func (midiMsg MIDIMessage) parsePresetData(messageData []byte) string {
+	offset := 0
+
+	if len(messageData) < 3 {
+		return "Truncated preset data"
+	}
+
+	//Two first bytes are preset number
+	presetNumber := uint16(messageData[1])<<8 | uint16(messageData[0])
+	offset += 2
+
+	//Unknown byte (0x00)
+	unkA := messageData[offset]
+	offset++
+
+	rnd := rand.Intn(9999)
+	tmpFileName := fmt.Sprintf("presetdata-preset%d-%d.dat", presetNumber, rnd)
+	os.WriteFile(tmpFileName, messageData, 0755)
+
+	f, err := os.Create(tmpFileName + "a")
+	if err != nil {
+		fmt.Println(err)
+		return ""
+	}
+
+	for i := offset; i < len(messageData)-1; i += 2 {
+		b := ((messageData[i]) << 4) | messageData[i+1]
+		f.Write([]byte{b})
+	}
+	f.Close()
+
+	return fmt.Sprintf("Preset %d dump to %s (unkA:%d)\n", presetNumber, tmpFileName, unkA)
+}
+
+func (midiMsg MIDIMessage) parsePresetData_Mof(messageData []byte) string {
 	offset := 0
 
 	if len(messageData) < 3 {
@@ -135,4 +170,24 @@ func (midiMsg MIDIMessage) parseLicenceCodeResponse(msg []byte) string {
 	default:
 		return fmt.Sprintf("Code validation response unknown 0x%02x", result)
 	}
+}
+
+func (midiMsg MIDIMessage) parseUnknown(msg []byte) string {
+	var str string
+	var decoded []byte
+	for i := 0; i < len(msg)-1; i += 2 {
+		decoded = append(decoded, midiTwoBytesTo8Bits(msg[i], msg[i+1]))
+	}
+
+	str += "Decoded 14bits:\n"
+	str += hex.Dump(decoded)
+
+	decoded = make([]byte, 0)
+	for i := 1; i < len(msg)-1; i += 2 {
+		decoded = append(decoded, midiTwoBytesTo8Bits(msg[i], msg[i+1]))
+	}
+	str += "Decoded 14bits (1 byte shift):\n"
+	str += hex.Dump(decoded)
+
+	return str
 }
