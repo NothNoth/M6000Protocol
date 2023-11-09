@@ -1,8 +1,13 @@
 package main
 
 import (
-	"encoding/hex"
-	"fmt"
+	"encoding/binary"
+	"log"
+	"os"
+
+	"m6kparse/common"
+	"m6kparse/midi"
+	"m6kparse/tcpparser"
 
 	"gitlab.gb/bgirard/wirego/wirego/wirego"
 )
@@ -17,6 +22,10 @@ const (
 	FieldIdMessagesNumber wirego.FieldId = 4
 	FieldIdFileName       wirego.FieldId = 5
 	FieldIdFrameName      wirego.FieldId = 6
+
+	FieldIdProtoVersion wirego.FieldId = 7
+	FieldIdBlockSize    wirego.FieldId = 8
+	FieldIdMessageType  wirego.FieldId = 9
 )
 
 // Since we implement the wirego.WiregoInterface we need some structure to hold it.
@@ -24,6 +33,9 @@ type WiregoM6k struct {
 	iconIdentified bool
 	iconIP         string
 	frameIP        string
+	parser         *tcpparser.TCPParser
+	midi           *midi.MIDI
+	log            *log.Logger
 }
 
 // Unused (but mandatory)
@@ -31,11 +43,17 @@ func main() {}
 
 // Called at golang environment initialization (you should probably not touch this)
 func init() {
-	var wge WiregoM6k
+	var wgo WiregoM6k
 
-	wge.iconIdentified = false
+	wgo.iconIdentified = false
 	//Register to the wirego package
-	wirego.Register(&wge)
+	wirego.Register(&wgo)
+
+	wgo.log = log.New(os.Stdout, "Wirego", 0)
+	wgo.midi = midi.New(wgo.log)
+
+	wgo.parser = nil
+
 }
 
 // This function is called when the plugin is loaded.
@@ -48,6 +66,8 @@ func (wgo *WiregoM6k) Setup() error {
 	fields = append(fields, wirego.WiresharkField{InternalId: FieldIdMessagesNumber, Name: "Msg number", Filter: "wirego.msgnum", ValueType: wirego.ValueTypeUInt32, DisplayMode: wirego.DisplayModeDecimal})
 	fields = append(fields, wirego.WiresharkField{InternalId: FieldIdFileName, Name: "File name", Filter: "wirego.filename", ValueType: wirego.ValueTypeCString, DisplayMode: wirego.DisplayModeNone})
 	fields = append(fields, wirego.WiresharkField{InternalId: FieldIdFrameName, Name: "Frame name", Filter: "wirego.framename", ValueType: wirego.ValueTypeCString, DisplayMode: wirego.DisplayModeNone})
+	fields = append(fields, wirego.WiresharkField{InternalId: FieldIdProtoVersion, Name: "Protocol version", Filter: "wirego.version", ValueType: wirego.ValueTypeUInt32, DisplayMode: wirego.DisplayModeDecimal})
+	fields = append(fields, wirego.WiresharkField{InternalId: FieldIdBlockSize, Name: "Block size", Filter: "wirego.bs", ValueType: wirego.ValueTypeUInt32, DisplayMode: wirego.DisplayModeDecimal})
 
 	return nil
 }
@@ -80,7 +100,6 @@ func (wgo *WiregoM6k) GetDissectorFilter() []wirego.DissectorFilter {
 	return filters
 }
 func (wgo *WiregoM6k) DissectPacket(src string, dst string, layer string, packet []byte) *wirego.DissectResult {
-	fmt.Println(layer)
 	if layer == "frame.eth.ethertype.ip.tcp.tcm6000" {
 		return wgo.DissectPacketTCP(src, dst, layer, packet)
 	} else if layer == "frame.eth.ethertype.ip.udp.tcm6000" {
@@ -130,7 +149,6 @@ func (wgo *WiregoM6k) DissectPacketUDP(src string, dst string, layer string, pac
 		parseFrameToIcon(packet, &res)
 	}
 
-	fmt.Println(hex.Dump(packet))
 	return &res
 }
 
@@ -138,10 +156,33 @@ func (wgo *WiregoM6k) DissectPacketUDP(src string, dst string, layer string, pac
 func (wgo *WiregoM6k) DissectPacketTCP(src string, dst string, layer string, packet []byte) *wirego.DissectResult {
 	var res wirego.DissectResult
 
-	//This string will appear on the packet being parsed
-	res.Protocol = "TC"
+	if wgo.parser == nil {
+		wgo.parser = tcpparser.New(wgo.iconIP, wgo.frameIP, wgo.log)
+	}
+	/*
+		if src == wgo.frameIP {
+			wgo.parser.ParseBlocks(packet, common.FrameToIcon)
+		} else {
+			wgo.parser.ParseBlocks(packet, common.IconToFrame)
+		}*/
 
-	fmt.Println(hex.Dump(packet))
+	//This string will appear on the packet being parsed
+	res.Protocol = "TC Proto"
+
+	res.Fields = append(res.Fields, wirego.DissectField{InternalId: FieldIdProtoVersion, Offset: 0, Length: 2})
+	res.Fields = append(res.Fields, wirego.DissectField{InternalId: FieldIdBlockSize, Offset: 2, Length: 2})
+
+	if (binary.BigEndian.Uint16(packet[:2]) == 0x0002) && (binary.BigEndian.Uint16(packet[2:4]) == uint16(len(packet)-4)) {
+		if src == wgo.frameIP {
+			res.Info = wgo.midi.Parse(packet[4:], common.FrameToIcon)
+		} else {
+			res.Info = wgo.midi.Parse(packet[4:], common.IconToFrame)
+		}
+	} else {
+		res.Info = "Split block (unsupported)"
+	}
+	//fmt.Println(hex.Dump(packet))
+
 	return &res
 }
 

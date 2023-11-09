@@ -36,7 +36,7 @@ func New(logs *log.Logger) *MIDI {
 	return &m
 }
 
-func (m *MIDI) Parse(midiData []byte, dir common.Direction) {
+func (m *MIDI) Parse(midiData []byte, dir common.Direction) string {
 	var msg MIDIMessage
 	m.logs.Println("*********** " + dir.String() + " **********")
 	defer m.logs.Println("----------------------------------")
@@ -64,6 +64,7 @@ func (m *MIDI) Parse(midiData []byte, dir common.Direction) {
 
 	if msg.data[0] == 0xFF {
 		msg.midiType = MIDITypeReset
+		return "MIDI Reset"
 	} else if msg.data[0] == 0xF0 {
 
 		if msg.data[len(msg.data)-1] == 0xF7 {
@@ -79,14 +80,14 @@ func (m *MIDI) Parse(midiData []byte, dir common.Direction) {
 				m.truncatedSysExIconToFrame = make([]byte, len(msg.data))
 				copy(m.truncatedSysExIconToFrame, msg.data)
 			}
-			return
+			return msg.MessageType()
 		}
 	} else {
 		m.logs.Println("[WARN] Totally unknown message:" + hex.Dump(msg.data))
-		return
+		return "Unknown"
 	}
 
-	m.logs.Println(msg)
+	return ""
 }
 
 const (
@@ -183,6 +184,12 @@ func midiToBytesToSigned14Bits(a byte, b byte) int16 {
 		return -value   //return negative value
 	}
 	return value
+}
+
+func (midiMsg MIDIMessage) MessageType() string {
+	msg := midiMsg.data[1 : len(midiMsg.data)-1]
+	messageType := msg[5] //More or less stable for TC product range
+	return messageTypeToString(messageType)
 }
 
 func (midiMsg MIDIMessage) String() string {

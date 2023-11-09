@@ -41,14 +41,14 @@ func (p *TCPParser) Parse(packet gopacket.Packet, ip *layers.IPv4, tcp *layers.T
 
 	if (ip.SrcIP.String() == p.frameIP) && (ip.DstIP.String() == p.iconIP) {
 		p.logs.Println("-> Frame to icon (tcp)")
-		p.parseBlocks(tcp.Payload, common.FrameToIcon)
+		p.ParseBlocks(tcp.Payload, common.FrameToIcon)
 	} else if (ip.SrcIP.String() == p.iconIP) && (ip.DstIP.String() == p.frameIP) {
 		p.logs.Println("-> Icon to frame (tcp)")
-		p.parseBlocks(tcp.Payload, common.IconToFrame)
+		p.ParseBlocks(tcp.Payload, common.IconToFrame)
 	}
 }
 
-func (p *TCPParser) parseBlocks(payload []byte, d common.Direction) {
+func (p *TCPParser) ParseBlocks(payload []byte, d common.Direction) {
 	offs := 0
 	msg := 1
 
