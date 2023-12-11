@@ -2,12 +2,9 @@ package m6000parser
 
 import (
 	"encoding/binary"
-	"fmt"
 	"log"
 	"m6kparse/common"
 	"m6kparse/midi"
-	"math/rand"
-	"os"
 )
 
 type BlockStatus int
@@ -31,13 +28,19 @@ type blockData struct {
 }
 
 type M6000Parser struct {
-	logs                     *log.Logger
-	dir                      common.Direction
-	midi                     *midi.MIDI
+	logs *log.Logger
+	dir  common.Direction
+	midi *midi.MIDI
+
+	//Split block management
 	partialStartPacketNumber int
 	partialBlockSize         int
 	partialBlockData         []byte
 
+	//Split Sysex management
+	partialSysex []byte
+
+	//
 	blockList  []blockData
 	cmdParsers map[byte]CmdParser
 }
@@ -88,6 +91,7 @@ func (m6p *M6000Parser) PushPacket(packetNumber int, data []byte) Result {
 				b := data[dataStartIdx+4 : dataStartIdx+4+blockSize]
 				result.Description = append(result.Description, m6p.pushBlock(packetNumber, packetNumber, b))
 				dataStartIdx = dataStartIdx + 4 + blockSize
+				//m6p.logs.Println(">> Full block read")
 
 				//Reached the end
 				if dataStartIdx == len(data) {
@@ -143,6 +147,5 @@ func (m6p *M6000Parser) pushBlock(packetStartNumber int, packetEndNumber int, bl
 	b.data = block
 	m6p.blockList = append(m6p.blockList, b)
 
-	os.WriteFile(fmt.Sprintf("Block-%d-%d-%d.dat", packetStartNumber, packetEndNumber, rand.Int()), block, 0755)
 	return m6p.parseBlock(b)
 }
