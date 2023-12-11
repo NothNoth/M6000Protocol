@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"log"
+	"m6kparse/common"
 	"m6kparse/m6000parser"
 	"os"
+	"strings"
 
 	"gitlab.qb/bgirard/wirego/wirego/wirego"
 )
@@ -46,9 +48,10 @@ func init() {
 	wgo.iconIdentified = false
 	//Register to the wirego package
 	wirego.Register(&wgo)
-	wgo.log = log.New(os.Stdout, "Wirego", 0)
-	wgo.iconToFrameParser = m6000parser.New(wgo.log)
-	wgo.frameToIconParser = m6000parser.New(wgo.log)
+	wgo.log = log.New(os.Stdout, "Wirego> ", 0)
+	wgo.log.Println("m6000 ready")
+	wgo.iconToFrameParser = m6000parser.New(wgo.log, common.IconToFrame)
+	wgo.frameToIconParser = m6000parser.New(wgo.log, common.FrameToIcon)
 }
 
 // This function is called when the plugin is loaded.
@@ -115,8 +118,20 @@ func (wgo *WiregoM6k) DissectPacketTCP(packetNumber int, src string, dst string,
 	res.Protocol = "TC Proto"
 
 	if !wgo.iconIdentified {
-		res.Info = "Icon not identified, cannot parse"
-		return &res
+		wgo.iconIdentified = true
+
+		if src == "192.168.1.249" {
+			wgo.frameIP = src
+			wgo.iconIP = dst
+		} else if dst == "192.168.1.249" {
+			wgo.frameIP = dst
+			wgo.iconIP = src
+		} else {
+			wgo.frameIP = src
+			wgo.iconIP = dst
+		}
+		//res.Info = "Icon not identified, cannot parse"
+		//return &res
 	}
 
 	//	res.Fields = append(res.Fields, wirego.DissectField{WiregoFieldId: FieldIdProtoVersion, Offset: 0, Length: 2})
@@ -131,15 +146,16 @@ func (wgo *WiregoM6k) DissectPacketTCP(packetNumber int, src string, dst string,
 		parserResult = wgo.frameToIconParser.PushPacket(packetNumber, packet)
 	}
 
+	aggregate := strings.Join(parserResult.Description, "|")
 	switch parserResult.Status {
 	case m6000parser.StatusPacketInvalid:
-		res.Info = "Block seems corrupted"
+		res.Info = "[Block seems corrupted]" + aggregate
 	case m6000parser.StatusPacketSplit:
-		res.Info = "Block is split"
+		res.Info = "[Block is split]" + aggregate
 	case m6000parser.StatusPacketSplitFinal:
-		res.Info = "Split block ends"
+		res.Info = "[Split End] " + aggregate
 	case m6000parser.StatusPacketFull:
-		res.Info = "Complete block"
+		res.Info = aggregate
 	default:
 		res.Info = "Invalid block status"
 	}
