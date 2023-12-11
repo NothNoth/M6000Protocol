@@ -1,12 +1,9 @@
 package main
 
 import (
-	"encoding/binary"
 	"fmt"
 	"log"
-	"m6kparse/common"
-	"m6kparse/midi"
-	"m6kparse/tcpparser"
+	"m6kparse/m6000parser"
 	"os"
 
 	"gitlab.qb/bgirard/wirego/wirego/wirego"
@@ -33,9 +30,10 @@ type WiregoM6k struct {
 	iconIdentified bool
 	iconIP         string
 	frameIP        string
-	parser         *tcpparser.TCPParser
-	midi           *midi.MIDI
-	log            *log.Logger
+
+	iconToFrameParser *m6000parser.M6000Parser
+	frameToIconParser *m6000parser.M6000Parser
+	log               *log.Logger
 }
 
 // Unused (but mandatory)
@@ -49,9 +47,8 @@ func init() {
 	//Register to the wirego package
 	wirego.Register(&wgo)
 	wgo.log = log.New(os.Stdout, "Wirego", 0)
-	wgo.midi = midi.New(wgo.log)
-
-	wgo.parser = nil
+	wgo.iconToFrameParser = m6000parser.New(wgo.log)
+	wgo.frameToIconParser = m6000parser.New(wgo.log)
 }
 
 // This function is called when the plugin is loaded.
@@ -114,32 +111,37 @@ func (wgo *WiregoM6k) DissectPacket(packetNumber int, src string, dst string, la
 func (wgo *WiregoM6k) DissectPacketTCP(packetNumber int, src string, dst string, layer string, packet []byte) *wirego.DissectResult {
 	var res wirego.DissectResult
 
-	if wgo.parser == nil {
-		wgo.parser = tcpparser.New(wgo.iconIP, wgo.frameIP, wgo.log)
-	}
-	/*
-		if src == wgo.frameIP {
-			wgo.parser.ParseBlocks(packet, common.FrameToIcon)
-		} else {
-			wgo.parser.ParseBlocks(packet, common.IconToFrame)
-		}*/
-
 	//This string will appear on the packet being parsed
 	res.Protocol = "TC Proto"
 
-	res.Fields = append(res.Fields, wirego.DissectField{WiregoFieldId: FieldIdProtoVersion, Offset: 0, Length: 2})
-	res.Fields = append(res.Fields, wirego.DissectField{WiregoFieldId: FieldIdBlockSize, Offset: 2, Length: 2})
-
-	if (binary.BigEndian.Uint16(packet[:2]) == 0x0002) && (binary.BigEndian.Uint16(packet[2:4]) == uint16(len(packet)-4)) {
-		if src == wgo.frameIP {
-			res.Info = wgo.midi.Parse(packet[4:], common.FrameToIcon)
-		} else {
-			res.Info = wgo.midi.Parse(packet[4:], common.IconToFrame)
-		}
-	} else {
-		res.Info = "Split block (unsupported)"
+	if !wgo.iconIdentified {
+		res.Info = "Icon not identified, cannot parse"
+		return &res
 	}
-	//fmt.Println(hex.Dump(packet))
 
+	//	res.Fields = append(res.Fields, wirego.DissectField{WiregoFieldId: FieldIdProtoVersion, Offset: 0, Length: 2})
+	//	res.Fields = append(res.Fields, wirego.DissectField{WiregoFieldId: FieldIdBlockSize, Offset: 2, Length: 2})
+
+	//	fmt.Println(hex.Dump(packet))
+	var parserResult m6000parser.Result
+
+	if src == wgo.iconIP {
+		parserResult = wgo.iconToFrameParser.PushPacket(packetNumber, packet)
+	} else {
+		parserResult = wgo.frameToIconParser.PushPacket(packetNumber, packet)
+	}
+
+	switch parserResult.Status {
+	case m6000parser.StatusPacketInvalid:
+		res.Info = "Block seems corrupted"
+	case m6000parser.StatusPacketSplit:
+		res.Info = "Block is split"
+	case m6000parser.StatusPacketSplitFinal:
+		res.Info = "Split block ends"
+	case m6000parser.StatusPacketFull:
+		res.Info = "Complete block"
+	default:
+		res.Info = "Invalid block status"
+	}
 	return &res
 }
