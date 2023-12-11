@@ -2,10 +2,12 @@ package m6000parser
 
 import (
 	"encoding/binary"
-	"encoding/hex"
+	"fmt"
 	"log"
 	"m6kparse/common"
 	"m6kparse/midi"
+	"math/rand"
+	"os"
 )
 
 type BlockStatus int
@@ -54,12 +56,16 @@ func New(logs *log.Logger, dir common.Direction) *M6000Parser {
 	m6p.cmdParsers = make(map[byte]CmdParser)
 	m6p.cmdParsers[SYXTYPE_CODECMD] = new(CodeCmd)
 	m6p.cmdParsers[SYXTYPE_CODECMD_RESPONSE] = new(CodeCmdResponse)
+	m6p.cmdParsers[SYXTYPE_PARAMREQUEST] = new(ParamRequest)
+	m6p.cmdParsers[SYXTYPE_PARAMDATA] = new(ParamResponse)
+	m6p.cmdParsers[SYXTYPE_PRESETREQUEST] = new(PresetRequest)
+	m6p.cmdParsers[SYXTYPE_PRESETDATA] = new(PresetData)
 	return &m6p
 }
 
 func (m6p *M6000Parser) PushPacket(packetNumber int, data []byte) Result {
 	var result Result
-	m6p.logs.Println(hex.Dump(data))
+	//m6p.logs.Println(hex.Dump(data))
 
 	//m6p.logs.Printf("> Push packet #%d with %d bytes of data\n", packetNumber, len(data))
 
@@ -137,5 +143,6 @@ func (m6p *M6000Parser) pushBlock(packetStartNumber int, packetEndNumber int, bl
 	b.data = block
 	m6p.blockList = append(m6p.blockList, b)
 
+	os.WriteFile(fmt.Sprintf("Block-%d-%d-%d.dat", packetStartNumber, packetEndNumber, rand.Int()), block, 0755)
 	return m6p.parseBlock(b)
 }

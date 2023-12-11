@@ -1,15 +1,13 @@
 package main
 
 import (
-	"fmt"
-
 	"gitlab.qb/bgirard/wirego/wirego/wirego"
 )
 
 // DissectPacket provides the packet payload to be parsed.
 func (wgo *WiregoM6k) DissectPacketUDP(packetNumber int, src string, dst string, layer string, packet []byte) *wirego.DissectResult {
 	var res wirego.DissectResult
-	fmt.Println("PKT ", packetNumber)
+
 	//This string will appear on the packet being parsed
 	res.Protocol = "TC Discovery"
 
