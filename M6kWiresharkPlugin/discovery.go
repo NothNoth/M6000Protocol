@@ -1,7 +1,7 @@
 package main
 
 import (
-	"gitlab.qb/bgirard/wirego/wirego/wirego"
+	"github.com/quarkslab/wirego/wirego/wirego"
 )
 
 // DissectPacket provides the packet payload to be parsed.

@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"gitlab.qb/bgirard/wirego/wirego/wirego"
+	"github.com/quarkslab/wirego/wirego/wirego"
 )
 
 var fields []wirego.WiresharkField
@@ -86,16 +86,24 @@ func (wgo *WiregoM6k) GetFields() []wirego.WiresharkField {
 	return fields
 }
 
-// GetDissectorFilter returns a wireshark filter that will select which packets
+// GetDetectionFilters returns a wireshark filter that will select which packets
 // will be sent to your dissector for parsing.
 // Two types of filters can be defined: Integers or Strings
-func (wgo *WiregoM6k) GetDissectorFilter() []wirego.DissectorFilter {
-	var filters []wirego.DissectorFilter
+func (wgo *WiregoM6k) GetDetectionFilters() []wirego.DetectionFilter {
+	var filters []wirego.DetectionFilter
 
-	filters = append(filters, wirego.DissectorFilter{FilterType: wirego.DissectorFilterTypeInt, Name: "udp.port", ValueInt: 17})
-	filters = append(filters, wirego.DissectorFilter{FilterType: wirego.DissectorFilterTypeInt, Name: "tcp.port", ValueInt: 1026})
+	filters = append(filters, wirego.DetectionFilter{FilterType: wirego.DetectionFilterTypeInt, Name: "udp.port", ValueInt: 17})
+	filters = append(filters, wirego.DetectionFilter{FilterType: wirego.DetectionFilterTypeInt, Name: "tcp.port", ValueInt: 1026})
 
 	return filters
+}
+
+func (wgo *WiregoM6k) GetDetectionHeuristicsParents() []string {
+	return []string{}
+}
+
+func (wgo *WiregoM6k) DetectionHeuristic(packetNumber int, src string, dst string, layer string, packet []byte) bool {
+	return false
 }
 
 func (wgo *WiregoM6k) DissectPacket(packetNumber int, src string, dst string, layer string, packet []byte) *wirego.DissectResult {

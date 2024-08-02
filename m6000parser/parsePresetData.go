@@ -10,6 +10,42 @@ type PresetData struct {
 func (cmd *PresetData) Parse(payload []byte) string {
 	presetNumber := uint16(payload[1])<<8 | uint16(payload[0])
 	/*
+		idx := 3
+		var str string
+		var inString bool
+
+		inString = true
+		for {
+			if idx+1 >= len(payload) {
+				break
+			}
+
+			a := payload[idx]
+			b := payload[idx+1]
+
+			if inString {
+				//End of string with double 0x00
+				if a == 0 && b == 0 {
+					inString = false
+					fmt.Println("STR: ", str)
+					str = ""
+
+				} else {
+					str += string(byte(uint16(a)<<4 | uint16(b)))
+				}
+				idx += 2
+			} else {
+				if (a != 0x00) && (a&0xF0 == 0x00) && (b != 0x00) && (b&0xF0 == 0x00) {
+					inString = true
+					str += string(byte(uint16(a)<<4 | uint16(b)))
+					idx += 2
+				} else {
+					idx++
+				}
+			}
+		}
+	*/
+	/*
 		//Partially works
 		//We have some actual preset strings but I can't determine a fixed preset size
 			fmt.Println(hex.Dump(payload))

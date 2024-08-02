@@ -1,6 +1,8 @@
 package m6000parser
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type PresetRequest struct {
 }
