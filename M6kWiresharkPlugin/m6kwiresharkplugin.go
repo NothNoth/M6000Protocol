@@ -59,7 +59,7 @@ func main() {
 }
 
 // This function is called when the plugin is loaded.
-func (wgo *WiregoM6k) Setup() error {
+func (wgo WiregoM6k) Setup() error {
 
 	//Setup our wireshark custom fields
 	fields = append(fields, wirego.WiresharkField{WiregoFieldId: FieldIdDiscoveryMagic, Name: "Discovery magic", Filter: "tcm6000.magic", ValueType: wirego.ValueTypeUInt32, DisplayMode: wirego.DisplayModeHexadecimal})
@@ -75,25 +75,25 @@ func (wgo *WiregoM6k) Setup() error {
 }
 
 // This function shall return the plugin name
-func (wgo *WiregoM6k) GetName() string {
+func (wgo WiregoM6k) GetName() string {
 	return "TC M6000"
 }
 
 // This function shall return the wireshark filter
-func (wgo *WiregoM6k) GetFilter() string {
+func (wgo WiregoM6k) GetFilter() string {
 	return "tcm6000"
 }
 
 // GetFields returns the list of fields descriptor that we may eventually return
 // when dissecting a packet payload
-func (wgo *WiregoM6k) GetFields() []wirego.WiresharkField {
+func (wgo WiregoM6k) GetFields() []wirego.WiresharkField {
 	return fields
 }
 
 // GetDetectionFilters returns a wireshark filter that will select which packets
 // will be sent to your dissector for parsing.
 // Two types of filters can be defined: Integers or Strings
-func (wgo *WiregoM6k) GetDetectionFilters() []wirego.DetectionFilter {
+func (wgo WiregoM6k) GetDetectionFilters() []wirego.DetectionFilter {
 	var filters []wirego.DetectionFilter
 
 	filters = append(filters, wirego.DetectionFilter{FilterType: wirego.DetectionFilterTypeInt, Name: "udp.port", ValueInt: 17})
@@ -102,15 +102,15 @@ func (wgo *WiregoM6k) GetDetectionFilters() []wirego.DetectionFilter {
 	return filters
 }
 
-func (wgo *WiregoM6k) GetDetectionHeuristicsParents() []string {
+func (wgo WiregoM6k) GetDetectionHeuristicsParents() []string {
 	return []string{}
 }
 
-func (wgo *WiregoM6k) DetectionHeuristic(packetNumber int, src string, dst string, layer string, packet []byte) bool {
+func (wgo WiregoM6k) DetectionHeuristic(packetNumber int, src string, dst string, layer string, packet []byte) bool {
 	return false
 }
 
-func (wgo *WiregoM6k) DissectPacket(packetNumber int, src string, dst string, layer string, packet []byte) *wirego.DissectResult {
+func (wgo WiregoM6k) DissectPacket(packetNumber int, src string, dst string, layer string, packet []byte) *wirego.DissectResult {
 	if layer == "frame.eth.ethertype.ip.tcp.tcm6000" {
 		return wgo.DissectPacketTCP(packetNumber, src, dst, layer, packet)
 	} else if layer == "frame.eth.ethertype.ip.udp.tcm6000" {
@@ -123,7 +123,7 @@ func (wgo *WiregoM6k) DissectPacket(packetNumber int, src string, dst string, la
 }
 
 // DissectPacket provides the packet payload to be parsed.
-func (wgo *WiregoM6k) DissectPacketTCP(packetNumber int, src string, dst string, layer string, packet []byte) *wirego.DissectResult {
+func (wgo WiregoM6k) DissectPacketTCP(packetNumber int, src string, dst string, layer string, packet []byte) *wirego.DissectResult {
 	var res wirego.DissectResult
 
 	//This string will appear on the packet being parsed
