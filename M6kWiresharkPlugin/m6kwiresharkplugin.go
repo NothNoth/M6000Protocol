@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"log"
 	"m6kparse/common"
@@ -8,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/quarkslab/wirego/wirego/wirego"
+	"github.com/quarkslab/wirego/wirego_remote/go/wirego"
 )
 
 var fields []wirego.WiresharkField
@@ -39,19 +40,22 @@ type WiregoM6k struct {
 }
 
 // Unused (but mandatory)
-func main() {}
-
-// Called at golang environment initialization (you should probably not touch this)
-func init() {
+func main() {
 	var wgo WiregoM6k
-
 	wgo.iconIdentified = false
-	//Register to the wirego package
-	wirego.Register(&wgo)
 	wgo.log = log.New(os.Stdout, "Wirego> ", 0)
 	wgo.log.Println("m6000 ready")
 	wgo.iconToFrameParser = m6000parser.New(wgo.log, common.IconToFrame)
 	wgo.frameToIconParser = m6000parser.New(wgo.log, common.FrameToIcon)
+
+	wg, err := wirego.New("ipc:///tmp/wirego0", false, wgo)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	wg.ResultsCacheEnable(false)
+
+	wg.Listen()
 }
 
 // This function is called when the plugin is loaded.
@@ -153,6 +157,22 @@ func (wgo *WiregoM6k) DissectPacketTCP(packetNumber int, src string, dst string,
 	} else {
 		parserResult = wgo.frameToIconParser.PushPacket(packetNumber, packet)
 	}
+
+	var tmp []byte
+	fmt.Println("A")
+	for i := 0; i < len(packet)-1; i += 2 {
+		a := packet[i]
+		b := packet[i+1]
+		tmp = append(tmp, (a<<4)|(b&0x0F))
+	}
+	fmt.Println(hex.Dump(tmp))
+	fmt.Println("B")
+	for i := 1; i < len(packet)-1; i += 2 {
+		a := packet[i]
+		b := packet[i+1]
+		tmp = append(tmp, (a<<4)|(b&0x0F))
+	}
+	fmt.Println(hex.Dump(tmp))
 
 	aggregate := strings.Join(parserResult.Description, "|")
 	switch parserResult.Status {

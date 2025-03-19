@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/quarkslab/wirego/wirego/wirego"
+	"github.com/quarkslab/wirego/wirego_remote/go/wirego"
 )
 
 // DissectPacket provides the packet payload to be parsed.

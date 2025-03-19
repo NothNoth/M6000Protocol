@@ -1,10 +1,18 @@
 package m6000parser
 
+import (
+	"encoding/hex"
+	"fmt"
+)
+
 type CodeCmd struct {
 }
 
 func (cmd *CodeCmd) Parse(payload []byte) string {
 	//header := payload[:2]
+
+	fmt.Println("Full payload:")
+	fmt.Println(hex.Dump(payload))
 
 	decoded := make([]byte, len(payload)-3)
 	idx := 0
