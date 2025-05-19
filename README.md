@@ -170,19 +170,19 @@ By analyzing the query / responses we can guess that:
 | Byte 4 / 5 | Count    |
 
 _Example:_
-
-Request Data:  06 79 00 00 00 2a 
-Request on engine 06, parameter x79, two unknown zero bytes, count is 0x00|0x2a = 42x14bits values.
-
-Response Data (88 bytes):
-	00000000  06 79 00 00 00 00 00 01  00 01 00 03 00 00 00 02  |.y..............|
-	00000010  00 01 00 02 00 01 00 01  01 7f 01 7f 01 7f 00 01  |................|
-	00000020  00 01 00 01 00 01 00 01  00 01 00 01 00 01 01 7f  |................|
-	00000030  00 03 01 7f 00 01 00 02  01 7f 01 7f 01 7f 00 01  |................|
-	00000040  00 01 00 01 00 03 00 02  00 02 00 02 00 02 01 7f  |................|
-	00000050  00 02 01 7f 00 02 01 7f                           |........|
- 
-Reponse for engine 06, parameter x79, followed by 42x14bits values (encoded into 84 bytes).
+	
+	Request Data:  06 79 00 00 00 2a 
+	Request on engine 06, parameter x79, two unknown zero bytes, count is 0x00|0x2a = 42x14bits values.
+	
+	Response Data (88 bytes):
+		00000000  06 79 00 00 00 00 00 01  00 01 00 03 00 00 00 02  |.y..............|
+		00000010  00 01 00 02 00 01 00 01  01 7f 01 7f 01 7f 00 01  |................|
+		00000020  00 01 00 01 00 01 00 01  00 01 00 01 00 01 01 7f  |................|
+		00000030  00 03 01 7f 00 01 00 02  01 7f 01 7f 01 7f 00 01  |................|
+		00000040  00 01 00 01 00 03 00 02  00 02 00 02 00 02 01 7f  |................|
+		00000050  00 02 01 7f 00 02 01 7f                           |........|
+	 
+	Reponse for engine 06, parameter x79, followed by 42x14bits values (encoded into 84 bytes).
 
 ## Param request/data
 
